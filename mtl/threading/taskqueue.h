@@ -11,76 +11,76 @@ namespace threading {
 // A concurrent task queue.
 // `T` is the type of the task's return type.
 template <typename T>
-class TaskQueue
-{
-public:
-  typedef std::packaged_task<T()> TTask;
-
-  TaskQueue() : stop_(false), no_more_task_(false) {}
-
-  // Put a task into queue and return a future
-  std::future<T> put(std::function<T()> task)
+  class TaskQueue
   {
-    std::unique_lock<std::mutex> lock(access_);
-    tasks_.push_back(TTask(task));
-    auto ret = tasks_.back().get_future();
-    cond_.notify_one();
-    return ret;
-  }
+    public:
+      typedef std::packaged_task<T()> TTask;
 
-  // Add a task into queue, no future returned.
-  void add(std::function<T()> task)
-  {
-    std::unique_lock<std::mutex> lock(access_);
-    tasks_.push_back(TTask(task));
-    cond_.notify_one();
-  }
+      TaskQueue() : stop_(false), no_more_task_(false) {}
 
-  // Get a task from queue
-  TTask get()
-  {
-    std::unique_lock<std::mutex> lock(access_);
-    while (!stop_ && !no_more_task_ && tasks_.empty()) {
-      cond_.wait(lock);
-    }
-    TTask task;
-    if (!stop_ && !tasks_.empty()) {
-      task = std::move(tasks_.front());
-      tasks_.pop_front();
-    }
-    return task;
-  }
+      // Put a task into queue and return a future
+      std::future<T> put(std::function<T()> task)
+      {
+        std::unique_lock<std::mutex> lock(access_);
+        tasks_.push_back(TTask(task));
+        auto ret = tasks_.back().get_future();
+        cond_.notify_one();
+        return ret;
+      }
 
-  // Stop the queue regardless whether the queue is empty or not
-  void stop()
-  {
-    {
-      std::unique_lock<std::mutex> lock(access_);
-      stop_ = true;
-    }
-    cond_.notify_all();
-  }
+      // Add a task into queue, no future returned.
+      void add(std::function<T()> task)
+      {
+        std::unique_lock<std::mutex> lock(access_);
+        tasks_.push_back(TTask(task));
+        cond_.notify_one();
+      }
 
-  // Indicates that no more task will be added to the queue.
-  // Invocation of get() will not keep the thread waiting if 
-  // the queue is empty.
-  void no_more_task() 
-  {
-    {
-      std::unique_lock<std::mutex> lock(access_);
-      no_more_task_ = true;
-    }
-    cond_.notify_all();
-  }
+      // Get a task from queue
+      TTask get()
+      {
+        std::unique_lock<std::mutex> lock(access_);
+        while (!stop_ && !no_more_task_ && tasks_.empty()) {
+          cond_.wait(lock);
+        }
+        TTask task;
+        if (!stop_ && !tasks_.empty()) {
+          task = std::move(tasks_.front());
+          tasks_.pop_front();
+        }
+        return task;
+      }
+
+      // Stop the queue regardless whether the queue is empty or not
+      void stop()
+      {
+        {
+          std::unique_lock<std::mutex> lock(access_);
+          stop_ = true;
+        }
+        cond_.notify_all();
+      }
+
+      // Indicates that no more task will be added to the queue.
+      // Invocation of get() will not keep the thread waiting if 
+      // the queue is empty.
+      void no_more_task() 
+      {
+        {
+          std::unique_lock<std::mutex> lock(access_);
+          no_more_task_ = true;
+        }
+        cond_.notify_all();
+      }
 
 
-private:
-	bool stop_;
-  bool no_more_task_;
-	mutable std::mutex      access_;
-	std::deque<TTask>       tasks_;
-	std::condition_variable cond_;
-};
+    private:
+      bool stop_;
+      bool no_more_task_;
+      mutable std::mutex      access_;
+      std::deque<TTask>       tasks_;
+      std::condition_variable cond_;
+  };
 
 } // namespace threading
 } // namespace mtl
