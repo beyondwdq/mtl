@@ -24,6 +24,7 @@ template <typename T>
         std::unique_lock<std::mutex> lock(access_);
         tasks_.push_back(TTask(task));
         auto ret = tasks_.back().get_future();
+        lock.unlock();
         cond_.notify_one();
         return ret;
       }
@@ -31,8 +32,10 @@ template <typename T>
       // Add a task into queue, no future returned.
       void add(std::function<T()> task)
       {
-        std::unique_lock<std::mutex> lock(access_);
-        tasks_.push_back(TTask(task));
+        {
+          std::unique_lock<std::mutex> lock(access_);
+          tasks_.push_back(TTask(task));
+        }
         cond_.notify_one();
       }
 
